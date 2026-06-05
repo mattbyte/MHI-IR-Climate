@@ -142,10 +142,7 @@ class MHIIRClimateEntity(ClimateEntity, RestoreEntity):
         """Return whether the configured infrared emitter is available."""
 
         state = self.hass.states.get(self._emitter_entity_id)
-        return state is not None and state.state not in (
-            STATE_UNKNOWN,
-            STATE_UNAVAILABLE,
-        )
+        return state is not None and state.state != STATE_UNAVAILABLE
 
     @property
     def current_temperature(self) -> float | None:
