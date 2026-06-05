@@ -1,0 +1,14 @@
+{
+  "domain": "mhi_ir_climate",
+  "name": "MHI IR Climate",
+  "version": "0.1.0",
+  "documentation": "https://github.com/mattbyte/MHI-IR-Climate",
+  "issue_tracker": "https://github.com/mattbyte/MHI-IR-Climate/issues",
+  "codeowners": ["@mattbyte"],
+  "dependencies": ["infrared"],
+  "after_dependencies": ["z2m_ir_bridge"],
+  "requirements": [],
+  "config_flow": true,
+  "iot_class": "local_push",
+  "homeassistant": "2026.4.0"
+}

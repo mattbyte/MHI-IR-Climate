@@ -1,0 +1,56 @@
+{
+  "title": "MHI IR Climate",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Add MHI air conditioner",
+        "description": "Create a climate entity linked to a native Home Assistant infrared emitter.",
+        "data": {
+          "name": "Name",
+          "emitter_entity_id": "Infrared emitter",
+          "model": "Model",
+          "base_frame_hex": "Base IR frame",
+          "temperature_sensor": "Room temperature sensor",
+          "humidity_sensor": "Room humidity sensor"
+        },
+        "data_description": {
+          "base_frame_hex": "A 19-byte MHI base frame as hexadecimal. The default is the frame used by the tested ZSA-series remotes.",
+          "temperature_sensor": "Optional sensor shown as the climate entity current temperature.",
+          "humidity_sensor": "Optional sensor shown as the climate entity current humidity."
+        }
+      }
+    },
+    "error": {
+      "invalid_base_frame": "The base frame must be valid hexadecimal that decodes to exactly 19 bytes.",
+      "invalid_emitter": "Select an available infrared emitter entity."
+    },
+    "abort": {
+      "no_emitters": "No native infrared emitter entities were found. Install and configure an infrared emitter integration first."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "MHI IR Climate options",
+        "description": "Update the linked infrared emitter, model profile, base frame, or room sensors.",
+        "data": {
+          "name": "Name",
+          "emitter_entity_id": "Infrared emitter",
+          "model": "Model",
+          "base_frame_hex": "Base IR frame",
+          "temperature_sensor": "Room temperature sensor",
+          "humidity_sensor": "Room humidity sensor"
+        },
+        "data_description": {
+          "base_frame_hex": "A 19-byte MHI base frame as hexadecimal. The default is the frame used by the tested ZSA-series remotes.",
+          "temperature_sensor": "Optional sensor shown as the climate entity current temperature.",
+          "humidity_sensor": "Optional sensor shown as the climate entity current humidity."
+        }
+      }
+    },
+    "error": {
+      "invalid_base_frame": "The base frame must be valid hexadecimal that decodes to exactly 19 bytes.",
+      "invalid_emitter": "Select an available infrared emitter entity."
+    }
+  }
+}
