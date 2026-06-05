@@ -1,5 +1,7 @@
 # MHI IR Climate
 
+[![HACS Custom](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://hacs.xyz/docs/faq/custom_repositories/)
+
 MHI IR Climate is a Home Assistant custom integration for controlling selected Mitsubishi Heavy Industries air conditioners through Home Assistant's native `infrared` platform.
 
 It creates normal `climate` entities for IR-only air conditioners and sends full-state IR commands through an infrared emitter entity, such as one provided by [IR Wrapper for Zigbee IR Blasters](https://github.com/tomer2526/IR-Wrapper-for-Zigbee-IR-Bluster).
@@ -12,7 +14,7 @@ This integration was created from working captures and scripts for:
 - Mitsubishi Heavy Industries SRK35ZSA-W with remote RLA502A700L
 - Tuya/Zosung-style Zigbee IR blasters exposed to Home Assistant as native infrared emitters
 
-The default protocol profile is intended for MHI ZSA-series units that use the same 19-byte command frame structure.
+The default protocol profile is intended for MHI ZSA-series units, commonly known as the Avanti series, that use the same 19-byte command frame structure.
 
 ## Features
 

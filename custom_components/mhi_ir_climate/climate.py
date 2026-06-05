@@ -17,7 +17,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     ATTR_TEMPERATURE,
     CONF_NAME,
-    PRECISION_WHOLE,
+    PRECISION_TENTHS,
     STATE_UNAVAILABLE,
     STATE_UNKNOWN,
     UnitOfTemperature,
@@ -66,7 +66,7 @@ class MHIIRClimateEntity(ClimateEntity, RestoreEntity):
     _attr_has_entity_name = False
     _attr_max_temp = MAX_TARGET_TEMPERATURE
     _attr_min_temp = MIN_TARGET_TEMPERATURE
-    _attr_precision = PRECISION_WHOLE
+    _attr_precision = PRECISION_TENTHS
     _attr_should_poll = False
     _attr_supported_features = (
         ClimateEntityFeature.TARGET_TEMPERATURE
