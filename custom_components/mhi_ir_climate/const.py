@@ -29,4 +29,6 @@ DEFAULT_MODEL = MODEL_ZSA_SERIES
 
 ATTR_INFRARED_EMITTER_ENTITY_ID = "infrared_emitter_entity_id"
 ATTR_LAST_ON_HVAC_MODE = "last_on_hvac_mode"
+ATTR_LAST_SWING_HORIZONTAL_MODE = "last_swing_horizontal_mode"
+ATTR_LAST_SWING_MODE = "last_swing_mode"
 ATTR_MODEL = "model"

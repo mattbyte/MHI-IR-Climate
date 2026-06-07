@@ -23,6 +23,8 @@ The default protocol profile is intended for MHI ZSA-series units, commonly know
 - Supports `off`, `cool`, and `heat` HVAC modes.
 - Supports target temperatures from 18 C to 30 C in 1 C steps.
 - Supports vertical swing modes: `3D Auto`, `Stop`, `0 Deg`, `30 Deg`, `45 Deg`, `60 Deg`, `90 Deg`, and `Moving`.
+- Supports horizontal swing modes: `3D Auto`, `Stop`, `Hard Left`, `Left`, `Straight`, `Right`, `Hard Right`, `Wide`, `Narrow`, and `Moving`.
+- Keeps `3D Auto` coupled across both swing axes, while restoring the other axis to its last non-3D mode when a normal swing mode is selected.
 - Restores the last HVAC mode, target temperature, and swing mode after Home Assistant restarts.
 - Optionally displays current room temperature and humidity from existing sensor entities.
 - Sends raw protocol timings through Home Assistant's infrared abstraction. The Zigbee IR wrapper handles the FastLZ/base64 encoding required by Zosung/Tuya Zigbee blasters.

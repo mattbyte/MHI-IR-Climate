@@ -69,6 +69,19 @@ SWING_MODES: Final = (
     "Moving",
 )
 
+SWING_HORIZONTAL_MODES: Final = (
+    "3D Auto",
+    "Stop",
+    "Hard Left",
+    "Left",
+    "Straight",
+    "Right",
+    "Hard Right",
+    "Wide",
+    "Narrow",
+    "Moving",
+)
+
 
 class MHIIRCommand(Command):
     """Raw IR command for the HA infrared platform."""

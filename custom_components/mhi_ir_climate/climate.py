@@ -10,6 +10,7 @@ from homeassistant.components.climate.const import (
     ATTR_CURRENT_HUMIDITY,
     ATTR_CURRENT_TEMPERATURE,
     ATTR_HVAC_MODE,
+    ATTR_SWING_HORIZONTAL_MODE,
     ATTR_SWING_MODE,
     HVACMode,
 )
@@ -31,6 +32,8 @@ from homeassistant.helpers.restore_state import RestoreEntity
 from .const import (
     ATTR_INFRARED_EMITTER_ENTITY_ID,
     ATTR_LAST_ON_HVAC_MODE,
+    ATTR_LAST_SWING_HORIZONTAL_MODE,
+    ATTR_LAST_SWING_MODE,
     ATTR_MODEL,
     CONF_BASE_FRAME_HEX,
     CONF_EMITTER_ENTITY_ID,
@@ -40,13 +43,15 @@ from .const import (
     DOMAIN,
     MODEL_LABELS,
 )
-from .ir_protocol import SWING_MODES, build_mhi_ir_command
+from .ir_protocol import SWING_HORIZONTAL_MODES, SWING_MODES, build_mhi_ir_command
 
 DEFAULT_TARGET_TEMPERATURE = 24
 MIN_TARGET_TEMPERATURE = 18
 MAX_TARGET_TEMPERATURE = 30
 SUPPORTED_HVAC_MODES = (HVACMode.OFF, HVACMode.COOL, HVACMode.HEAT)
 ON_HVAC_MODES = (HVACMode.COOL, HVACMode.HEAT)
+SWING_3D_AUTO = "3D Auto"
+SWING_STOP = "Stop"
 
 
 async def async_setup_entry(
@@ -71,6 +76,7 @@ class MHIIRClimateEntity(ClimateEntity, RestoreEntity):
     _attr_supported_features = (
         ClimateEntityFeature.TARGET_TEMPERATURE
         | ClimateEntityFeature.SWING_MODE
+        | ClimateEntityFeature.SWING_HORIZONTAL_MODE
         | ClimateEntityFeature.TURN_ON
         | ClimateEntityFeature.TURN_OFF
     )
@@ -100,6 +106,8 @@ class MHIIRClimateEntity(ClimateEntity, RestoreEntity):
         self._model_label = MODEL_LABELS.get(self._model, self._model)
         self._name = data[CONF_NAME]
         self._last_on_hvac_mode = HVACMode.COOL
+        self._last_swing_mode: str | None = None
+        self._last_swing_horizontal_mode: str | None = None
 
         self._attr_name = self._name
         self._attr_unique_id = entry.unique_id or entry.entry_id
@@ -112,7 +120,9 @@ class MHIIRClimateEntity(ClimateEntity, RestoreEntity):
         self._attr_hvac_modes = list(SUPPORTED_HVAC_MODES)
         self._attr_hvac_mode = HVACMode.OFF
         self._attr_swing_modes = list(SWING_MODES)
-        self._attr_swing_mode = SWING_MODES[0]
+        self._attr_swing_mode = SWING_3D_AUTO
+        self._attr_swing_horizontal_modes = list(SWING_HORIZONTAL_MODES)
+        self._attr_swing_horizontal_mode = SWING_3D_AUTO
         self._attr_target_temperature = DEFAULT_TARGET_TEMPERATURE
         self._attr_current_temperature = None
         self._attr_current_humidity = None
@@ -170,6 +180,8 @@ class MHIIRClimateEntity(ClimateEntity, RestoreEntity):
         return {
             ATTR_INFRARED_EMITTER_ENTITY_ID: self._emitter_entity_id,
             ATTR_LAST_ON_HVAC_MODE: self._last_on_hvac_mode.value,
+            ATTR_LAST_SWING_MODE: self._last_swing_mode,
+            ATTR_LAST_SWING_HORIZONTAL_MODE: self._last_swing_horizontal_mode,
             ATTR_MODEL: self._model_label,
         }
 
@@ -208,7 +220,23 @@ class MHIIRClimateEntity(ClimateEntity, RestoreEntity):
         if swing_mode not in self._attr_swing_modes:
             raise HomeAssistantError(f"Unsupported swing mode: {swing_mode}")
 
-        self._attr_swing_mode = swing_mode
+        self._set_vertical_swing_mode(swing_mode)
+        self.async_write_ha_state()
+        if self._attr_hvac_mode != HVACMode.OFF:
+            await self._async_send_current_state()
+
+    async def async_set_swing_horizontal_mode(
+        self,
+        swing_horizontal_mode: str,
+    ) -> None:
+        """Set horizontal swing mode and send an IR command if the unit is on."""
+
+        if swing_horizontal_mode not in self._attr_swing_horizontal_modes:
+            raise HomeAssistantError(
+                f"Unsupported horizontal swing mode: {swing_horizontal_mode}"
+            )
+
+        self._set_horizontal_swing_mode(swing_horizontal_mode)
         self.async_write_ha_state()
         if self._attr_hvac_mode != HVACMode.OFF:
             await self._async_send_current_state()
@@ -253,6 +281,30 @@ class MHIIRClimateEntity(ClimateEntity, RestoreEntity):
 
         if (swing_mode := previous_state.attributes.get(ATTR_SWING_MODE)) in SWING_MODES:
             self._attr_swing_mode = swing_mode
+            if swing_mode != SWING_3D_AUTO:
+                self._last_swing_mode = swing_mode
+
+        horizontal_restored = previous_state.attributes.get(ATTR_SWING_HORIZONTAL_MODE)
+        horizontal_was_stored = horizontal_restored is not None
+        if horizontal_restored in SWING_HORIZONTAL_MODES:
+            self._attr_swing_horizontal_mode = horizontal_restored
+            if horizontal_restored != SWING_3D_AUTO:
+                self._last_swing_horizontal_mode = horizontal_restored
+
+        if last_swing_mode := previous_state.attributes.get(ATTR_LAST_SWING_MODE):
+            if last_swing_mode in SWING_MODES and last_swing_mode != SWING_3D_AUTO:
+                self._last_swing_mode = last_swing_mode
+
+        if last_swing_horizontal_mode := previous_state.attributes.get(
+            ATTR_LAST_SWING_HORIZONTAL_MODE
+        ):
+            if (
+                last_swing_horizontal_mode in SWING_HORIZONTAL_MODES
+                and last_swing_horizontal_mode != SWING_3D_AUTO
+            ):
+                self._last_swing_horizontal_mode = last_swing_horizontal_mode
+
+        self._reconcile_restored_swing_modes(horizontal_was_stored)
 
         if (
             current_temperature := previous_state.attributes.get(
@@ -288,6 +340,7 @@ class MHIIRClimateEntity(ClimateEntity, RestoreEntity):
                 power_on,
                 base_frame_hex=self._base_frame_hex,
                 swing_ud=cast(str | None, self._attr_swing_mode),
+                swing_lr=cast(str | None, self._attr_swing_horizontal_mode),
             )
         except ValueError as err:
             raise HomeAssistantError(str(err)) from err
@@ -314,6 +367,61 @@ class MHIIRClimateEntity(ClimateEntity, RestoreEntity):
             return fallback
 
         return _state_float(state, fallback)
+
+    def _set_vertical_swing_mode(self, swing_mode: str) -> None:
+        """Update vertical swing and keep 3D Auto axes coupled."""
+
+        if swing_mode == SWING_3D_AUTO:
+            self._attr_swing_mode = SWING_3D_AUTO
+            self._attr_swing_horizontal_mode = SWING_3D_AUTO
+            return
+
+        self._attr_swing_mode = swing_mode
+        self._last_swing_mode = swing_mode
+
+        if self._attr_swing_horizontal_mode == SWING_3D_AUTO:
+            self._attr_swing_horizontal_mode = (
+                self._last_swing_horizontal_mode or SWING_STOP
+            )
+
+        if self._attr_swing_horizontal_mode != SWING_3D_AUTO:
+            self._last_swing_horizontal_mode = self._attr_swing_horizontal_mode
+
+    def _set_horizontal_swing_mode(self, swing_horizontal_mode: str) -> None:
+        """Update horizontal swing and keep 3D Auto axes coupled."""
+
+        if swing_horizontal_mode == SWING_3D_AUTO:
+            self._attr_swing_mode = SWING_3D_AUTO
+            self._attr_swing_horizontal_mode = SWING_3D_AUTO
+            return
+
+        self._attr_swing_horizontal_mode = swing_horizontal_mode
+        self._last_swing_horizontal_mode = swing_horizontal_mode
+
+        if self._attr_swing_mode == SWING_3D_AUTO:
+            self._attr_swing_mode = self._last_swing_mode or SWING_STOP
+
+        if self._attr_swing_mode != SWING_3D_AUTO:
+            self._last_swing_mode = self._attr_swing_mode
+
+    def _reconcile_restored_swing_modes(self, horizontal_was_stored: bool) -> None:
+        """Normalize restored swing state after upgrades or partial attributes."""
+
+        if not horizontal_was_stored and self._attr_swing_mode != SWING_3D_AUTO:
+            self._attr_swing_horizontal_mode = (
+                self._last_swing_horizontal_mode or SWING_STOP
+            )
+
+        if (
+            self._attr_swing_mode == SWING_3D_AUTO
+            or self._attr_swing_horizontal_mode == SWING_3D_AUTO
+        ):
+            self._attr_swing_mode = SWING_3D_AUTO
+            self._attr_swing_horizontal_mode = SWING_3D_AUTO
+            return
+
+        self._last_swing_mode = self._attr_swing_mode
+        self._last_swing_horizontal_mode = self._attr_swing_horizontal_mode
 
 
 def _optional_entity_id(value: Any) -> str | None:
