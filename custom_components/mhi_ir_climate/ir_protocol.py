@@ -6,7 +6,7 @@ from typing import Final, Literal
 
 from infrared_protocols.commands import Command
 
-Mode = Literal["cool", "heat"]
+Mode = Literal["cool", "heat", "dry", "fan_only", "heat_cool"]
 
 DEFAULT_BASE_FRAME_HEX: Final = "52aec31ae5f609f807ff004db25aa5ff007f80"
 DEFAULT_CARRIER_FREQUENCY: Final = 38_000
@@ -14,14 +14,45 @@ DEFAULT_CARRIER_FREQUENCY: Final = 38_000
 TEMP_NIBBLE_START: Final = 64
 TEMP_COMP_START: Final = 56
 
-MODE_BITS: Final = (40, 42, 48, 50)
-COOL_PATTERN: Final = (0, 1, 1, 0)
-HEAT_PATTERN: Final = (1, 0, 0, 1)
+MODE_BYTE: Final = 5
+MODE_COMP_BYTE: Final = 6
+MODE_CODES: Final = {
+    "cool": 0xF6,
+    "heat": 0xF3,
+    "dry": 0xF5,
+    "fan_only": 0xF4,
+    "heat_cool": 0xF7,
+}
 
 POWER_BITS: Final = (43, 51)
 
 SWING_UD_BYTE: Final = 11
 SWING_LR_BYTE: Final = 13
+
+FAN_BYTE: Final = 9
+FAN_COMP_BYTE: Final = 10
+
+FAN_AUTO = "Auto"
+FAN_VERY_LOW = "Very Low"
+FAN_LOW = "Low"
+FAN_MEDIUM = "Medium"
+FAN_HIGH = "High"
+FAN_MODES: Final = (
+    FAN_AUTO,
+    FAN_VERY_LOW,
+    FAN_LOW,
+    FAN_MEDIUM,
+    FAN_HIGH,
+)
+DEFAULT_FAN_MODE: Final = FAN_AUTO
+FAN_CODES: Final = {
+    "auto": 0xFF,
+    "very_low": 0xFE,
+    "low": 0xFD,
+    "medium": 0xFC,
+    "med": 0xFC,
+    "high": 0xFB,
+}
 
 UD_CODES: Final = {
     "3d_auto": 0x2D,
@@ -109,6 +140,7 @@ def build_mhi_ir_command(
     temperature_c: int,
     power_on: bool,
     base_frame_hex: str,
+    fan_mode: str = DEFAULT_FAN_MODE,
     swing_ud: str | None = None,
     swing_lr: str | None = None,
 ) -> MHIIRCommand:
@@ -119,6 +151,7 @@ def build_mhi_ir_command(
         temperature_c,
         power_on,
         base_frame_hex=base_frame_hex,
+        fan_mode=fan_mode,
         swing_ud=swing_ud,
         swing_lr=swing_lr,
     )
@@ -139,13 +172,14 @@ def build_ac_frame_bytes(
     temperature_c: int,
     power_on: bool,
     base_frame_hex: str,
+    fan_mode: str = DEFAULT_FAN_MODE,
     swing_ud: str | None = None,
     swing_lr: str | None = None,
 ) -> bytes:
     """Return the 19-byte MHI AC frame for the requested state."""
 
-    if mode not in ("cool", "heat"):
-        raise ValueError("mode must be 'cool' or 'heat'")
+    if mode not in MODE_CODES:
+        raise ValueError(f"mode must be one of {sorted(MODE_CODES)}")
     if not 18 <= temperature_c <= 30:
         raise ValueError("temperature_c must be 18..30")
 
@@ -153,14 +187,18 @@ def build_ac_frame_bytes(
     if len(frame) != 19:
         raise ValueError("base_frame_hex must decode to 19 bytes")
 
-    pattern = COOL_PATTERN if mode == "cool" else HEAT_PATTERN
-    for bit_index, bit_value in zip(MODE_BITS, pattern, strict=True):
-        _set_bit(frame, bit_index, bit_value)
+    mode_code = MODE_CODES[mode]
+    frame[MODE_BYTE] = mode_code
+    frame[MODE_COMP_BYTE] = mode_code ^ 0xFF
 
     temp_code = temperature_c - 17
     comp_code = 15 - temp_code
     _set_nibble_lsb_first(frame, TEMP_NIBBLE_START, temp_code)
     _set_nibble_lsb_first(frame, TEMP_COMP_START, comp_code)
+
+    fan_code = _pick_fan_code(fan_mode)
+    frame[FAN_BYTE] = fan_code
+    frame[FAN_COMP_BYTE] = fan_code ^ 0xFF
 
     ud_code, lr_code = _pick_swing_codes(swing_ud, swing_lr)
     frame[SWING_UD_BYTE] = ud_code
@@ -222,6 +260,21 @@ def _normalize_swing(value: str | None) -> str | None:
         normalized = normalized.replace("__", "_")
     normalized = normalized.replace("3dauto", "3d_auto")
     return normalized
+
+
+def _normalize_fan_mode(value: str) -> str:
+    normalized = str(value).strip().lower()
+    normalized = normalized.replace("/", "_").replace("-", "_").replace(" ", "_")
+    while "__" in normalized:
+        normalized = normalized.replace("__", "_")
+    return normalized
+
+
+def _pick_fan_code(fan_mode: str) -> int:
+    normalized = _normalize_fan_mode(fan_mode)
+    if normalized not in FAN_CODES:
+        raise ValueError(f"Unknown fan mode: {fan_mode}")
+    return FAN_CODES[normalized]
 
 
 def _pick_swing_codes(

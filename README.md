@@ -20,11 +20,13 @@ The default protocol profile is intended for MHI ZSA-series units, commonly know
 
 - Adds a Home Assistant `climate` entity from the UI.
 - Links each climate entity to a selected native `infrared` emitter entity.
-- Supports `off`, `cool`, and `heat` HVAC modes.
+- Supports `off`, `cool`, `heat`, `dry`, `fan only`, and `heat/cool` HVAC modes.
 - Supports target temperatures from 18 C to 30 C in 1 C steps.
+- Supports fan speeds: `Auto`, `Very Low`, `Low`, `Medium`, and `High`.
 - Supports vertical swing modes: `3D Auto`, `Stop`, `0 Deg`, `30 Deg`, `45 Deg`, `60 Deg`, `90 Deg`, and `Moving`.
 - Supports horizontal swing modes: `3D Auto`, `Stop`, `Hard Left`, `Left`, `Straight`, `Right`, `Hard Right`, `Wide`, `Narrow`, and `Moving`.
 - Keeps `3D Auto` coupled across both swing axes, while restoring the other axis to its last non-3D mode when a normal swing mode is selected.
+- Falls back to the last non-3D swing modes, or `Stop` when unknown, when `dry` or `fan only` mode is active because `3D Auto` is not available in those modes.
 - Restores the last HVAC mode, target temperature, and swing mode after Home Assistant restarts.
 - Optionally displays current room temperature and humidity from existing sensor entities.
 - Sends raw protocol timings through Home Assistant's infrared abstraction. The Zigbee IR wrapper handles the FastLZ/base64 encoding required by Zosung/Tuya Zigbee blasters.
@@ -72,7 +74,7 @@ For Zosung/Tuya Zigbee IR blasters, the companion Zigbee IR wrapper receives tho
 
 ## Current Limitations
 
-- Only `cool`, `heat`, and `off` are implemented.
+- Only captured ZSA/Avanti command mappings are implemented.
 - Fan speed, dry mode, auto mode, and horizontal swing are not exposed yet because the supplied working setup did not include stable frame mappings for those controls.
 - IR is one-way. The climate entity is optimistic and restores its last known state, but it cannot confirm what the physical air conditioner actually did.
 
