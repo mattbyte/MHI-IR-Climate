@@ -23,6 +23,8 @@ The default protocol profile is intended for MHI ZSA-series units, commonly know
 - Supports `off`, `cool`, `heat`, `dry`, `fan only`, and `heat/cool` HVAC modes.
 - Supports target temperatures from 18 C to 30 C in 1 C steps.
 - Supports fan speeds: `Auto`, `Very Low`, `Low`, `Medium`, and `High`.
+- Supports `Boost` and `Silent` climate presets in cool, heat, and heat/cool modes.
+- Clears `Boost` in Home Assistant state after 15 minutes without sending another IR command.
 - Adds a device configuration select for power LED brightness: `Dim`, `Normal`, and `Off`.
 - Adds a device configuration button to force-send the current IR state when Home Assistant and the physical unit are out of sync.
 - Supports vertical swing modes: `3D Auto`, `Stop`, `0 Deg`, `30 Deg`, `45 Deg`, `60 Deg`, `90 Deg`, and `Moving`.

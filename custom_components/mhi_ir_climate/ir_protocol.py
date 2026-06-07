@@ -54,6 +54,27 @@ FAN_CODES: Final = {
     "high": 0xFB,
 }
 
+PRESET_NONE = "none"
+PRESET_BOOST = "boost"
+PRESET_SILENT = "silent"
+PRESET_MODES: Final = (
+    PRESET_NONE,
+    PRESET_BOOST,
+    PRESET_SILENT,
+)
+DEFAULT_PRESET_MODE: Final = PRESET_NONE
+PRESET_KEYS: Final = {
+    "none": PRESET_NONE,
+    "boost": PRESET_BOOST,
+    "powerful": PRESET_BOOST,
+    "silent": PRESET_SILENT,
+}
+PRESET_BYTE: Final = 15
+PRESET_COMP_BYTE: Final = 16
+SILENT_PRESET_CODE: Final = 0x7F
+NORMAL_PRESET_CODE: Final = 0xFF
+BOOST_FAN_CODE: Final = 0xF7
+
 LED_BRIGHTNESS_DIM = "Dim"
 LED_BRIGHTNESS_NORMAL = "Normal"
 LED_BRIGHTNESS_OFF = "Off"
@@ -160,6 +181,7 @@ def build_mhi_ir_command(
     base_frame_hex: str,
     fan_mode: str = DEFAULT_FAN_MODE,
     led_brightness: str = DEFAULT_LED_BRIGHTNESS,
+    preset_mode: str = DEFAULT_PRESET_MODE,
     swing_ud: str | None = None,
     swing_lr: str | None = None,
 ) -> MHIIRCommand:
@@ -172,6 +194,7 @@ def build_mhi_ir_command(
         base_frame_hex=base_frame_hex,
         fan_mode=fan_mode,
         led_brightness=led_brightness,
+        preset_mode=preset_mode,
         swing_ud=swing_ud,
         swing_lr=swing_lr,
     )
@@ -194,6 +217,7 @@ def build_ac_frame_bytes(
     base_frame_hex: str,
     fan_mode: str = DEFAULT_FAN_MODE,
     led_brightness: str = DEFAULT_LED_BRIGHTNESS,
+    preset_mode: str = DEFAULT_PRESET_MODE,
     swing_ud: str | None = None,
     swing_lr: str | None = None,
 ) -> bytes:
@@ -220,6 +244,17 @@ def build_ac_frame_bytes(
     fan_code = _pick_fan_code(fan_mode)
     frame[FAN_BYTE] = fan_code
     frame[FAN_COMP_BYTE] = fan_code ^ 0xFF
+
+    preset_mode = _pick_preset_mode(preset_mode)
+    if preset_mode == PRESET_BOOST:
+        frame[FAN_BYTE] = BOOST_FAN_CODE
+        frame[FAN_COMP_BYTE] = BOOST_FAN_CODE ^ 0xFF
+
+    preset_code = (
+        SILENT_PRESET_CODE if preset_mode == PRESET_SILENT else NORMAL_PRESET_CODE
+    )
+    frame[PRESET_BYTE] = preset_code
+    frame[PRESET_COMP_BYTE] = preset_code ^ 0xFF
 
     led_brightness = _pick_led_brightness(led_brightness)
     ud_code, lr_code = _pick_swing_codes(swing_ud, swing_lr)
@@ -304,6 +339,13 @@ def _pick_fan_code(fan_mode: str) -> int:
     if normalized not in FAN_CODES:
         raise ValueError(f"Unknown fan mode: {fan_mode}")
     return FAN_CODES[normalized]
+
+
+def _pick_preset_mode(preset_mode: str) -> str:
+    normalized = str(preset_mode).strip().lower().replace("-", "_").replace(" ", "_")
+    if normalized not in PRESET_KEYS:
+        raise ValueError(f"Unknown preset mode: {preset_mode}")
+    return PRESET_KEYS[normalized]
 
 
 def _pick_led_brightness(led_brightness: str) -> str:
