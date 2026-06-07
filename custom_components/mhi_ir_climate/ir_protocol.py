@@ -73,7 +73,7 @@ PRESET_BYTE: Final = 15
 PRESET_COMP_BYTE: Final = 16
 SILENT_PRESET_CODE: Final = 0x7F
 NORMAL_PRESET_CODE: Final = 0xFF
-BOOST_FAN_CODE: Final = 0xF7
+BOOST_FAN_MASK: Final = 0x08
 
 LED_BRIGHTNESS_DIM = "Dim"
 LED_BRIGHTNESS_NORMAL = "Normal"
@@ -92,6 +92,11 @@ LED_BRIGHTNESS_KEYS: Final = {
 LED_DIM_LR_MASK: Final = 0x10
 LED_OFF_BYTE: Final = 17
 LED_OFF_MASK: Final = 0x01
+
+DEFAULT_AUTO_CLEAN: Final = False
+AUTO_CLEAN_MASK: Final = 0x04
+AUTO_CLEAN_START_MODES: Final = ("cool", "dry", "heat_cool")
+AUTO_CLEAN_START_MODE_NIBBLE: Final = 0x90
 
 UD_CODES: Final = {
     "3d_auto": 0x2D,
@@ -179,9 +184,11 @@ def build_mhi_ir_command(
     temperature_c: int,
     power_on: bool,
     base_frame_hex: str,
+    auto_clean: bool = DEFAULT_AUTO_CLEAN,
     fan_mode: str = DEFAULT_FAN_MODE,
     led_brightness: str = DEFAULT_LED_BRIGHTNESS,
     preset_mode: str = DEFAULT_PRESET_MODE,
+    start_auto_clean: bool = False,
     swing_ud: str | None = None,
     swing_lr: str | None = None,
 ) -> MHIIRCommand:
@@ -192,9 +199,11 @@ def build_mhi_ir_command(
         temperature_c,
         power_on,
         base_frame_hex=base_frame_hex,
+        auto_clean=auto_clean,
         fan_mode=fan_mode,
         led_brightness=led_brightness,
         preset_mode=preset_mode,
+        start_auto_clean=start_auto_clean,
         swing_ud=swing_ud,
         swing_lr=swing_lr,
     )
@@ -215,9 +224,11 @@ def build_ac_frame_bytes(
     temperature_c: int,
     power_on: bool,
     base_frame_hex: str,
+    auto_clean: bool = DEFAULT_AUTO_CLEAN,
     fan_mode: str = DEFAULT_FAN_MODE,
     led_brightness: str = DEFAULT_LED_BRIGHTNESS,
     preset_mode: str = DEFAULT_PRESET_MODE,
+    start_auto_clean: bool = False,
     swing_ud: str | None = None,
     swing_lr: str | None = None,
 ) -> bytes:
@@ -232,7 +243,16 @@ def build_ac_frame_bytes(
     if len(frame) != 19:
         raise ValueError("base_frame_hex must decode to 19 bytes")
 
+    if start_auto_clean:
+        if mode not in AUTO_CLEAN_START_MODES:
+            raise ValueError(
+                "auto clean start can only be sent for cool, dry, or heat_cool"
+            )
+        power_on = True
+
     mode_code = MODE_CODES[mode]
+    if start_auto_clean:
+        mode_code = (mode_code & 0x0F) | AUTO_CLEAN_START_MODE_NIBBLE
     frame[MODE_BYTE] = mode_code
     frame[MODE_COMP_BYTE] = mode_code ^ 0xFF
 
@@ -247,8 +267,8 @@ def build_ac_frame_bytes(
 
     preset_mode = _pick_preset_mode(preset_mode)
     if preset_mode == PRESET_BOOST:
-        frame[FAN_BYTE] = BOOST_FAN_CODE
-        frame[FAN_COMP_BYTE] = BOOST_FAN_CODE ^ 0xFF
+        frame[FAN_BYTE] = fan_code & ~BOOST_FAN_MASK
+        frame[FAN_COMP_BYTE] = frame[FAN_BYTE] ^ 0xFF
 
     preset_code = (
         SILENT_PRESET_CODE if preset_mode == PRESET_SILENT else NORMAL_PRESET_CODE
@@ -268,6 +288,10 @@ def build_ac_frame_bytes(
         frame[LED_OFF_BYTE] &= ~LED_OFF_MASK
     else:
         frame[LED_OFF_BYTE] |= LED_OFF_MASK
+    if auto_clean:
+        frame[LED_OFF_BYTE] &= ~AUTO_CLEAN_MASK
+    else:
+        frame[LED_OFF_BYTE] |= AUTO_CLEAN_MASK
     frame[LED_OFF_BYTE + 1] = frame[LED_OFF_BYTE] ^ 0xFF
 
     if not power_on:

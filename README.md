@@ -26,6 +26,7 @@ The default protocol profile is intended for MHI ZSA-series units, commonly know
 - Supports `Boost` and `Silent` climate presets in cool, heat, and heat/cool modes.
 - Clears `Boost` in Home Assistant state after 15 minutes without sending another IR command.
 - Adds a device configuration select for power LED brightness: `Dim`, `Normal`, and `Off`.
+- Adds a device configuration switch for auto clean, including clean-cycle turn-off commands for cool, dry, and heat/cool modes.
 - Adds a device configuration button to force-send the current IR state when Home Assistant and the physical unit are out of sync.
 - Supports vertical swing modes: `3D Auto`, `Stop`, `0 Deg`, `30 Deg`, `45 Deg`, `60 Deg`, `90 Deg`, and `Moving`.
 - Supports horizontal swing modes: `3D Auto`, `Stop`, `Hard Left`, `Left`, `Straight`, `Right`, `Hard Right`, `Wide`, `Narrow`, and `Moving`.
@@ -79,7 +80,6 @@ For Zosung/Tuya Zigbee IR blasters, the companion Zigbee IR wrapper receives tho
 ## Current Limitations
 
 - Only captured ZSA/Avanti command mappings are implemented.
-- Fan speed, dry mode, auto mode, and horizontal swing are not exposed yet because the supplied working setup did not include stable frame mappings for those controls.
 - IR is one-way. The climate entity is optimistic and restores its last known state, but it cannot confirm what the physical air conditioner actually did.
 
 ## Development Notes

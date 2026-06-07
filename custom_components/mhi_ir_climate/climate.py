@@ -48,6 +48,7 @@ from .const import (
     MODEL_LABELS,
 )
 from .ir_protocol import (
+    DEFAULT_AUTO_CLEAN,
     DEFAULT_FAN_MODE,
     DEFAULT_LED_BRIGHTNESS,
     FAN_MODES,
@@ -70,6 +71,7 @@ SUPPORTED_HVAC_MODES = (
 )
 ON_HVAC_MODES = tuple(mode for mode in SUPPORTED_HVAC_MODES if mode != HVACMode.OFF)
 PRESET_HVAC_MODES = (HVACMode.COOL, HVACMode.HEAT, HVACMode.HEAT_COOL)
+AUTO_CLEAN_HVAC_MODES = (HVACMode.COOL, HVACMode.DRY, HVACMode.HEAT_COOL)
 MODES_WITHOUT_3D_AUTO = (HVACMode.DRY, HVACMode.FAN_ONLY)
 BOOST_PRESET_SECONDS = 15 * 60
 SWING_3D_AUTO = "3D Auto"
@@ -226,6 +228,14 @@ class MHIIRClimateEntity(ClimateEntity, RestoreEntity):
         if mode not in SUPPORTED_HVAC_MODES:
             raise HomeAssistantError(f"Unsupported HVAC mode: {hvac_mode}")
 
+        previous_mode = _coerce_hvac_mode(cast(HVACMode | str, self._attr_hvac_mode))
+        powering_off = mode == HVACMode.OFF and previous_mode in ON_HVAC_MODES
+        start_auto_clean = (
+            powering_off
+            and previous_mode in AUTO_CLEAN_HVAC_MODES
+            and self._auto_clean_for_command()
+        )
+
         self._attr_hvac_mode = mode
         if mode in ON_HVAC_MODES:
             self._last_on_hvac_mode = mode
@@ -235,7 +245,10 @@ class MHIIRClimateEntity(ClimateEntity, RestoreEntity):
         self._ensure_swing_available_for_mode(mode)
 
         self.async_write_ha_state()
-        await self._async_send_current_state()
+        await self._async_send_current_state(
+            off_hvac_mode=previous_mode if powering_off else None,
+            start_auto_clean=start_auto_clean,
+        )
 
     async def async_set_temperature(self, **kwargs: Any) -> None:
         """Set target temperature and send an IR command if the unit is on."""
@@ -403,11 +416,21 @@ class MHIIRClimateEntity(ClimateEntity, RestoreEntity):
 
         self.async_write_ha_state()
 
-    async def _async_send_current_state(self) -> None:
+    async def _async_send_current_state(
+        self,
+        *,
+        off_hvac_mode: HVACMode | None = None,
+        start_auto_clean: bool = False,
+    ) -> None:
         """Send an IR command representing the entity's current target state."""
 
         power_on = self._attr_hvac_mode != HVACMode.OFF
-        mode = _hvac_mode_to_protocol_mode(self._attr_hvac_mode)
+        command_hvac_mode = (
+            self._attr_hvac_mode
+            if power_on
+            else off_hvac_mode or self._last_on_hvac_mode
+        )
+        mode = _hvac_mode_to_protocol_mode(command_hvac_mode)
         temperature = _clamp_temperature(
             self._attr_target_temperature or DEFAULT_TARGET_TEMPERATURE
         )
@@ -418,9 +441,11 @@ class MHIIRClimateEntity(ClimateEntity, RestoreEntity):
                 temperature,
                 power_on,
                 base_frame_hex=self._base_frame_hex,
+                auto_clean=self._auto_clean_for_command(),
                 fan_mode=self._fan_mode_for_command(),
                 led_brightness=self._led_brightness_for_command(),
                 preset_mode=cast(str, self._attr_preset_mode),
+                start_auto_clean=start_auto_clean,
                 swing_ud=cast(str | None, self._attr_swing_mode),
                 swing_lr=cast(str | None, self._attr_swing_horizontal_mode),
             )
@@ -585,6 +610,17 @@ class MHIIRClimateEntity(ClimateEntity, RestoreEntity):
             str,
             self._runtime_data.get("led_brightness", DEFAULT_LED_BRIGHTNESS),
         )
+
+    def _auto_clean_for_command(self) -> bool:
+        """Return whether auto clean is enabled."""
+
+        return bool(self._runtime_data.get("auto_clean", DEFAULT_AUTO_CLEAN))
+
+    async def async_auto_clean_setting_changed(self, enabled: bool) -> None:
+        """Send the state needed after the auto clean switch changes."""
+
+        if self._attr_hvac_mode != HVACMode.OFF or not enabled:
+            await self._async_send_current_state()
 
     async def async_send_current_state_if_on(self) -> None:
         """Send the current IR state when the climate entity is on."""
