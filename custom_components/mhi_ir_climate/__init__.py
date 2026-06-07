@@ -6,13 +6,18 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
 from .const import DOMAIN, PLATFORMS
+from .ir_protocol import DEFAULT_LED_BRIGHTNESS
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up MHI IR Climate from a config entry."""
 
     hass.data.setdefault(DOMAIN, {})
-    hass.data[DOMAIN][entry.entry_id] = {**entry.data, **entry.options}
+    hass.data[DOMAIN][entry.entry_id] = {
+        "climate_entity": None,
+        "config": {**entry.data, **entry.options},
+        "led_brightness": DEFAULT_LED_BRIGHTNESS,
+    }
 
     entry.async_on_unload(entry.add_update_listener(async_reload_entry))
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)

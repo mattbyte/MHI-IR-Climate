@@ -46,6 +46,7 @@ from .const import (
 )
 from .ir_protocol import (
     DEFAULT_FAN_MODE,
+    DEFAULT_LED_BRIGHTNESS,
     FAN_MODES,
     SWING_HORIZONTAL_MODES,
     SWING_MODES,
@@ -76,8 +77,10 @@ async def async_setup_entry(
 ) -> None:
     """Set up the climate entity for a config entry."""
 
-    data = hass.data[DOMAIN][entry.entry_id]
-    async_add_entities([MHIIRClimateEntity(hass, entry, data)])
+    runtime_data = hass.data[DOMAIN][entry.entry_id]
+    entity = MHIIRClimateEntity(hass, entry, runtime_data)
+    runtime_data["climate_entity"] = entity
+    async_add_entities([entity])
 
 
 class MHIIRClimateEntity(ClimateEntity, RestoreEntity):
@@ -110,17 +113,19 @@ class MHIIRClimateEntity(ClimateEntity, RestoreEntity):
 
         self.hass = hass
         self._entry = entry
-        self._emitter_entity_id = data[CONF_EMITTER_ENTITY_ID]
+        self._runtime_data = data
+        config = data["config"]
+        self._emitter_entity_id = config[CONF_EMITTER_ENTITY_ID]
         self._temperature_sensor_entity_id = _optional_entity_id(
-            data.get(CONF_TEMPERATURE_SENSOR)
+            config.get(CONF_TEMPERATURE_SENSOR)
         )
         self._humidity_sensor_entity_id = _optional_entity_id(
-            data.get(CONF_HUMIDITY_SENSOR)
+            config.get(CONF_HUMIDITY_SENSOR)
         )
-        self._base_frame_hex = data[CONF_BASE_FRAME_HEX]
-        self._model = data[CONF_MODEL]
+        self._base_frame_hex = config[CONF_BASE_FRAME_HEX]
+        self._model = config[CONF_MODEL]
         self._model_label = MODEL_LABELS.get(self._model, self._model)
-        self._name = data[CONF_NAME]
+        self._name = config[CONF_NAME]
         self._last_on_hvac_mode = HVACMode.COOL
         self._last_swing_mode: str | None = None
         self._last_swing_horizontal_mode: str | None = None
@@ -213,6 +218,7 @@ class MHIIRClimateEntity(ClimateEntity, RestoreEntity):
         self._attr_hvac_mode = mode
         if mode in ON_HVAC_MODES:
             self._last_on_hvac_mode = mode
+        self._ensure_fan_available_for_mode(mode)
         self._ensure_swing_available_for_mode(mode)
 
         self.async_write_ha_state()
@@ -239,7 +245,9 @@ class MHIIRClimateEntity(ClimateEntity, RestoreEntity):
         if fan_mode not in self._attr_fan_modes:
             raise HomeAssistantError(f"Unsupported fan mode: {fan_mode}")
 
-        self._attr_fan_mode = fan_mode
+        self._attr_fan_mode = (
+            DEFAULT_FAN_MODE if self._attr_hvac_mode == HVACMode.DRY else fan_mode
+        )
         self.async_write_ha_state()
         if self._attr_hvac_mode != HVACMode.OFF:
             await self._async_send_current_state()
@@ -338,6 +346,7 @@ class MHIIRClimateEntity(ClimateEntity, RestoreEntity):
                 self._last_swing_horizontal_mode = last_swing_horizontal_mode
 
         self._reconcile_restored_swing_modes(horizontal_was_stored)
+        self._ensure_fan_available_for_mode(self._attr_hvac_mode)
         self._ensure_swing_available_for_mode(self._attr_hvac_mode)
 
         if (
@@ -373,7 +382,8 @@ class MHIIRClimateEntity(ClimateEntity, RestoreEntity):
                 temperature,
                 power_on,
                 base_frame_hex=self._base_frame_hex,
-                fan_mode=cast(str, self._attr_fan_mode),
+                fan_mode=self._fan_mode_for_command(),
+                led_brightness=self._led_brightness_for_command(),
                 swing_ud=cast(str | None, self._attr_swing_mode),
                 swing_lr=cast(str | None, self._attr_swing_horizontal_mode),
             )
@@ -481,6 +491,39 @@ class MHIIRClimateEntity(ClimateEntity, RestoreEntity):
             self._last_swing_mode = self._attr_swing_mode
         if self._attr_swing_horizontal_mode != SWING_3D_AUTO:
             self._last_swing_horizontal_mode = self._attr_swing_horizontal_mode
+
+    def _ensure_fan_available_for_mode(self, hvac_mode: HVACMode) -> None:
+        """Dry mode always uses auto fan."""
+
+        if hvac_mode == HVACMode.DRY:
+            self._attr_fan_mode = DEFAULT_FAN_MODE
+
+    def _fan_mode_for_command(self) -> str:
+        """Return the fan mode that can be sent for the current HVAC mode."""
+
+        if self._attr_hvac_mode == HVACMode.DRY:
+            return DEFAULT_FAN_MODE
+
+        return cast(str, self._attr_fan_mode)
+
+    def _led_brightness_for_command(self) -> str:
+        """Return the selected LED brightness."""
+
+        return cast(
+            str,
+            self._runtime_data.get("led_brightness", DEFAULT_LED_BRIGHTNESS),
+        )
+
+    async def async_send_current_state_if_on(self) -> None:
+        """Send the current IR state when the climate entity is on."""
+
+        if self._attr_hvac_mode != HVACMode.OFF:
+            await self._async_send_current_state()
+
+    async def async_force_send_current_state(self) -> None:
+        """Force-send the current IR state."""
+
+        await self._async_send_current_state()
 
 
 def _optional_entity_id(value: Any) -> str | None:

@@ -23,6 +23,8 @@ The default protocol profile is intended for MHI ZSA-series units, commonly know
 - Supports `off`, `cool`, `heat`, `dry`, `fan only`, and `heat/cool` HVAC modes.
 - Supports target temperatures from 18 C to 30 C in 1 C steps.
 - Supports fan speeds: `Auto`, `Very Low`, `Low`, `Medium`, and `High`.
+- Adds a device configuration select for power LED brightness: `Dim`, `Normal`, and `Off`.
+- Adds a device configuration button to force-send the current IR state when Home Assistant and the physical unit are out of sync.
 - Supports vertical swing modes: `3D Auto`, `Stop`, `0 Deg`, `30 Deg`, `45 Deg`, `60 Deg`, `90 Deg`, and `Moving`.
 - Supports horizontal swing modes: `3D Auto`, `Stop`, `Hard Left`, `Left`, `Straight`, `Right`, `Hard Right`, `Wide`, `Narrow`, and `Moving`.
 - Keeps `3D Auto` coupled across both swing axes, while restoring the other axis to its last non-3D mode when a normal swing mode is selected.
