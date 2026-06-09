@@ -17,12 +17,9 @@ from .const import (
     CONF_BASE_FRAME_HEX,
     CONF_EMITTER_ENTITY_ID,
     CONF_HUMIDITY_SENSOR,
-    CONF_MODEL,
     CONF_TEMPERATURE_SENSOR,
-    DEFAULT_MODEL,
     DEFAULT_NAME,
     DOMAIN,
-    MODEL_LABELS,
 )
 from .ir_protocol import DEFAULT_BASE_FRAME_HEX, validate_base_frame_hex
 
@@ -128,18 +125,6 @@ def _schema(defaults: dict[str, Any] | None = None) -> vol.Schema:
         vol.Required(CONF_NAME, default=defaults.get(CONF_NAME, DEFAULT_NAME)): str,
         emitter_marker: selector.EntitySelector(
             selector.EntitySelectorConfig(domain="infrared"),
-        ),
-        vol.Required(
-            CONF_MODEL,
-            default=defaults.get(CONF_MODEL, DEFAULT_MODEL),
-        ): selector.SelectSelector(
-            selector.SelectSelectorConfig(
-                options=[
-                    {"value": value, "label": label}
-                    for value, label in MODEL_LABELS.items()
-                ],
-                mode=selector.SelectSelectorMode.DROPDOWN,
-            )
         ),
         vol.Required(
             CONF_BASE_FRAME_HEX,

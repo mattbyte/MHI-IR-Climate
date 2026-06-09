@@ -42,10 +42,9 @@ from .const import (
     CONF_BASE_FRAME_HEX,
     CONF_EMITTER_ENTITY_ID,
     CONF_HUMIDITY_SENSOR,
-    CONF_MODEL,
     CONF_TEMPERATURE_SENSOR,
+    DEVICE_MODEL,
     DOMAIN,
-    MODEL_LABELS,
 )
 from .ir_protocol import (
     DEFAULT_AUTO_CLEAN,
@@ -133,8 +132,6 @@ class MHIIRClimateEntity(ClimateEntity, RestoreEntity):
             config.get(CONF_HUMIDITY_SENSOR)
         )
         self._base_frame_hex = config[CONF_BASE_FRAME_HEX]
-        self._model = config[CONF_MODEL]
-        self._model_label = MODEL_LABELS.get(self._model, self._model)
         self._name = config[CONF_NAME]
         self._last_on_hvac_mode = HVACMode.COOL
         self._last_swing_mode: str | None = None
@@ -146,7 +143,7 @@ class MHIIRClimateEntity(ClimateEntity, RestoreEntity):
         self._attr_device_info = {
             "identifiers": {(DOMAIN, entry.entry_id)},
             "manufacturer": "Mitsubishi Heavy Industries",
-            "model": self._model_label,
+            "model": DEVICE_MODEL,
             "name": self._name,
         }
         self._attr_hvac_modes = list(SUPPORTED_HVAC_MODES)
@@ -219,7 +216,7 @@ class MHIIRClimateEntity(ClimateEntity, RestoreEntity):
             ATTR_LAST_ON_HVAC_MODE: self._last_on_hvac_mode.value,
             ATTR_LAST_SWING_MODE: self._last_swing_mode,
             ATTR_LAST_SWING_HORIZONTAL_MODE: self._last_swing_horizontal_mode,
-            ATTR_MODEL: self._model_label,
+            ATTR_MODEL: DEVICE_MODEL,
         }
 
     async def async_set_hvac_mode(self, hvac_mode: HVACMode | str) -> None:

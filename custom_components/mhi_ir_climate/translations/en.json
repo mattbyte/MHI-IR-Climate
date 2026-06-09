@@ -8,7 +8,6 @@
         "data": {
           "name": "Name",
           "emitter_entity_id": "Infrared emitter",
-          "model": "Model",
           "base_frame_hex": "Base IR frame",
           "temperature_sensor": "Room temperature sensor",
           "humidity_sensor": "Room humidity sensor"
@@ -32,11 +31,10 @@
     "step": {
       "init": {
         "title": "MHI IR Climate options",
-        "description": "Update the linked infrared emitter, model profile, base frame, or room sensors.",
+        "description": "Update the linked infrared emitter, base frame, or room sensors.",
         "data": {
           "name": "Name",
           "emitter_entity_id": "Infrared emitter",
-          "model": "Model",
           "base_frame_hex": "Base IR frame",
           "temperature_sensor": "Room temperature sensor",
           "humidity_sensor": "Room humidity sensor"
