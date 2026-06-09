@@ -6,7 +6,11 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
 from .const import DOMAIN, PLATFORMS
-from .ir_protocol import DEFAULT_AUTO_CLEAN, DEFAULT_LED_BRIGHTNESS
+from .ir_protocol import (
+    DEFAULT_AUTO_CLEAN,
+    DEFAULT_INSTALL_POSITION,
+    DEFAULT_LED_BRIGHTNESS,
+)
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -17,6 +21,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         "climate_entity": None,
         "config": {**entry.data, **entry.options},
         "auto_clean": DEFAULT_AUTO_CLEAN,
+        "install_position": DEFAULT_INSTALL_POSITION,
         "led_brightness": DEFAULT_LED_BRIGHTNESS,
     }
 

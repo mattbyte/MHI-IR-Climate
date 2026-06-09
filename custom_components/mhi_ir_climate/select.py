@@ -14,7 +14,9 @@ from homeassistant.helpers.restore_state import RestoreEntity
 
 from .const import DOMAIN
 from .ir_protocol import (
+    DEFAULT_INSTALL_POSITION,
     DEFAULT_LED_BRIGHTNESS,
+    INSTALL_POSITION_MODES,
     LED_BRIGHTNESS_MODES,
 )
 
@@ -27,7 +29,12 @@ async def async_setup_entry(
     """Set up select entities."""
 
     runtime_data = hass.data[DOMAIN][entry.entry_id]
-    async_add_entities([MHIIRPowerLedSelect(entry, runtime_data)])
+    async_add_entities(
+        [
+            MHIIRPowerLedSelect(entry, runtime_data),
+            MHIIRInstallPositionSelect(entry, runtime_data),
+        ]
+    )
 
 
 class MHIIRPowerLedSelect(SelectEntity, RestoreEntity):
@@ -76,3 +83,56 @@ class MHIIRPowerLedSelect(SelectEntity, RestoreEntity):
         climate_entity = self._runtime_data.get("climate_entity")
         if climate_entity is not None:
             await climate_entity.async_send_current_state_if_on()
+
+
+class MHIIRInstallPositionSelect(SelectEntity, RestoreEntity):
+    """Indoor unit installation position select."""
+
+    _attr_entity_category = EntityCategory.CONFIG
+    _attr_has_entity_name = True
+    _attr_name = "Installation position"
+    _attr_options = list(INSTALL_POSITION_MODES)
+
+    def __init__(self, entry: ConfigEntry, runtime_data: dict[str, Any]) -> None:
+        """Initialize the select."""
+
+        self._entry = entry
+        self._runtime_data = runtime_data
+        self._attr_current_option = runtime_data.get(
+            "install_position",
+            DEFAULT_INSTALL_POSITION,
+        )
+        self._attr_unique_id = f"{entry.unique_id or entry.entry_id}_install_position"
+        self._attr_device_info = {
+            "identifiers": {(DOMAIN, entry.entry_id)},
+        }
+
+    async def async_added_to_hass(self) -> None:
+        """Restore the selected installation position."""
+
+        await super().async_added_to_hass()
+
+        previous_state = await self.async_get_last_state()
+        if previous_state is not None and previous_state.state in INSTALL_POSITION_MODES:
+            self._attr_current_option = previous_state.state
+
+        self._runtime_data["install_position"] = self._attr_current_option
+
+    async def async_select_option(self, option: str) -> None:
+        """Select a new installation position."""
+
+        if option not in INSTALL_POSITION_MODES:
+            raise HomeAssistantError(f"Unsupported installation position: {option}")
+
+        if option == self._attr_current_option:
+            return
+
+        climate_entity = self._runtime_data.get("climate_entity")
+        if climate_entity is None:
+            raise HomeAssistantError("MHI IR climate entity is not ready")
+
+        await climate_entity.async_send_install_position(option)
+
+        self._attr_current_option = option
+        self._runtime_data["install_position"] = option
+        self.async_write_ha_state()

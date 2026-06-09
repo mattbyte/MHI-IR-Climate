@@ -56,6 +56,7 @@ from .ir_protocol import (
     SWING_HORIZONTAL_MODES,
     SWING_MODES,
     build_mhi_ir_command,
+    normalize_preset_mode,
 )
 
 DEFAULT_TARGET_TEMPERATURE = 24
@@ -268,6 +269,11 @@ class MHIIRClimateEntity(ClimateEntity, RestoreEntity):
     async def async_set_preset_mode(self, preset_mode: str) -> None:
         """Set preset mode."""
 
+        try:
+            preset_mode = normalize_preset_mode(preset_mode)
+        except ValueError as err:
+            raise HomeAssistantError(str(err)) from err
+
         if preset_mode not in self._attr_preset_modes:
             raise HomeAssistantError(f"Unsupported preset mode: {preset_mode}")
 
@@ -362,8 +368,11 @@ class MHIIRClimateEntity(ClimateEntity, RestoreEntity):
         if (fan_mode := previous_state.attributes.get(ATTR_FAN_MODE)) in FAN_MODES:
             self._attr_fan_mode = fan_mode
 
-        if (preset_mode := previous_state.attributes.get(ATTR_PRESET_MODE)) in PRESET_MODES:
-            self._attr_preset_mode = preset_mode
+        if (preset_mode := previous_state.attributes.get(ATTR_PRESET_MODE)) is not None:
+            try:
+                self._attr_preset_mode = normalize_preset_mode(preset_mode)
+            except ValueError:
+                pass
 
         if (swing_mode := previous_state.attributes.get(ATTR_SWING_MODE)) in SWING_MODES:
             self._attr_swing_mode = swing_mode
@@ -421,6 +430,7 @@ class MHIIRClimateEntity(ClimateEntity, RestoreEntity):
         *,
         off_hvac_mode: HVACMode | None = None,
         start_auto_clean: bool = False,
+        install_position: str | None = None,
     ) -> None:
         """Send an IR command representing the entity's current target state."""
 
@@ -446,6 +456,7 @@ class MHIIRClimateEntity(ClimateEntity, RestoreEntity):
                 led_brightness=self._led_brightness_for_command(),
                 preset_mode=cast(str, self._attr_preset_mode),
                 start_auto_clean=start_auto_clean,
+                install_position=install_position,
                 swing_ud=cast(str | None, self._attr_swing_mode),
                 swing_lr=cast(str | None, self._attr_swing_horizontal_mode),
             )
@@ -621,6 +632,16 @@ class MHIIRClimateEntity(ClimateEntity, RestoreEntity):
 
         if self._attr_hvac_mode != HVACMode.OFF or not enabled:
             await self._async_send_current_state()
+
+    async def async_send_install_position(self, install_position: str) -> None:
+        """Send a one-shot installation position command."""
+
+        if self._attr_hvac_mode != HVACMode.OFF:
+            raise HomeAssistantError(
+                "Installation position can only be changed while the AC is off"
+            )
+
+        await self._async_send_current_state(install_position=install_position)
 
     async def async_send_current_state_if_on(self) -> None:
         """Send the current IR state when the climate entity is on."""

@@ -56,7 +56,7 @@ FAN_CODES: Final = {
 
 PRESET_NONE = "none"
 PRESET_BOOST = "boost"
-PRESET_SILENT = "silent"
+PRESET_SILENT = "Silent"
 PRESET_MODES: Final = (
     PRESET_NONE,
     PRESET_BOOST,
@@ -97,6 +97,30 @@ DEFAULT_AUTO_CLEAN: Final = False
 AUTO_CLEAN_MASK: Final = 0x04
 AUTO_CLEAN_START_MODES: Final = ("cool", "dry", "heat_cool")
 AUTO_CLEAN_START_MODE_NIBBLE: Final = 0x90
+
+INSTALL_POSITION_LEFT = "Left"
+INSTALL_POSITION_CENTRE = "Centre"
+INSTALL_POSITION_RIGHT = "Right"
+INSTALL_POSITION_MODES: Final = (
+    INSTALL_POSITION_LEFT,
+    INSTALL_POSITION_CENTRE,
+    INSTALL_POSITION_RIGHT,
+)
+DEFAULT_INSTALL_POSITION: Final = INSTALL_POSITION_CENTRE
+INSTALL_POSITION_KEYS: Final = {
+    "left": INSTALL_POSITION_LEFT,
+    "left_side": INSTALL_POSITION_LEFT,
+    "centre": INSTALL_POSITION_CENTRE,
+    "center": INSTALL_POSITION_CENTRE,
+    "right": INSTALL_POSITION_RIGHT,
+    "right_side": INSTALL_POSITION_RIGHT,
+}
+INSTALL_POSITION_MASK: Final = 0x60
+INSTALL_POSITION_CODES: Final = {
+    INSTALL_POSITION_LEFT: 0x00,
+    INSTALL_POSITION_RIGHT: 0x20,
+    INSTALL_POSITION_CENTRE: 0x40,
+}
 
 UD_CODES: Final = {
     "3d_auto": 0x2D,
@@ -189,6 +213,7 @@ def build_mhi_ir_command(
     led_brightness: str = DEFAULT_LED_BRIGHTNESS,
     preset_mode: str = DEFAULT_PRESET_MODE,
     start_auto_clean: bool = False,
+    install_position: str | None = None,
     swing_ud: str | None = None,
     swing_lr: str | None = None,
 ) -> MHIIRCommand:
@@ -204,6 +229,7 @@ def build_mhi_ir_command(
         led_brightness=led_brightness,
         preset_mode=preset_mode,
         start_auto_clean=start_auto_clean,
+        install_position=install_position,
         swing_ud=swing_ud,
         swing_lr=swing_lr,
     )
@@ -229,6 +255,7 @@ def build_ac_frame_bytes(
     led_brightness: str = DEFAULT_LED_BRIGHTNESS,
     preset_mode: str = DEFAULT_PRESET_MODE,
     start_auto_clean: bool = False,
+    install_position: str | None = None,
     swing_ud: str | None = None,
     swing_lr: str | None = None,
 ) -> bytes:
@@ -292,6 +319,11 @@ def build_ac_frame_bytes(
         frame[LED_OFF_BYTE] &= ~AUTO_CLEAN_MASK
     else:
         frame[LED_OFF_BYTE] |= AUTO_CLEAN_MASK
+    if install_position is not None:
+        position = normalize_install_position(install_position)
+        frame[LED_OFF_BYTE] = (
+            frame[LED_OFF_BYTE] & ~INSTALL_POSITION_MASK
+        ) | INSTALL_POSITION_CODES[position]
     frame[LED_OFF_BYTE + 1] = frame[LED_OFF_BYTE] ^ 0xFF
 
     if not power_on:
@@ -366,10 +398,23 @@ def _pick_fan_code(fan_mode: str) -> int:
 
 
 def _pick_preset_mode(preset_mode: str) -> str:
+    return normalize_preset_mode(preset_mode)
+
+
+def normalize_preset_mode(preset_mode: str) -> str:
     normalized = str(preset_mode).strip().lower().replace("-", "_").replace(" ", "_")
     if normalized not in PRESET_KEYS:
         raise ValueError(f"Unknown preset mode: {preset_mode}")
     return PRESET_KEYS[normalized]
+
+
+def normalize_install_position(install_position: str) -> str:
+    normalized = (
+        str(install_position).strip().lower().replace("-", "_").replace(" ", "_")
+    )
+    if normalized not in INSTALL_POSITION_KEYS:
+        raise ValueError(f"Unknown installation position: {install_position}")
+    return INSTALL_POSITION_KEYS[normalized]
 
 
 def _pick_led_brightness(led_brightness: str) -> str:
