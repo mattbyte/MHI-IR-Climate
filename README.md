@@ -1,4 +1,4 @@
-# 🌡️ MHI IR Climate
+# MHI IR Climate
 
 ![MHI IR Climate logo](custom_components/mhi_ir_climate/brand/logo.png)
 
