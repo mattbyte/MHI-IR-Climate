@@ -51,6 +51,7 @@ from .ir_protocol import (
     DEFAULT_FAN_MODE,
     DEFAULT_LED_BRIGHTNESS,
     FAN_MODES,
+    PRESET_NIGHT_SETBACK,
     PRESET_MODES,
     SWING_HORIZONTAL_MODES,
     SWING_MODES,
@@ -237,7 +238,13 @@ class MHIIRClimateEntity(ClimateEntity, RestoreEntity):
         self._attr_hvac_mode = mode
         if mode in ON_HVAC_MODES:
             self._last_on_hvac_mode = mode
-        if mode not in PRESET_HVAC_MODES:
+        if (
+            mode not in PRESET_HVAC_MODES
+            or (
+                self._attr_preset_mode == PRESET_NIGHT_SETBACK
+                and mode != HVACMode.HEAT
+            )
+        ):
             self._set_preset_mode_without_ir(PRESET_NONE)
         self._ensure_fan_available_for_mode(mode)
         self._ensure_swing_available_for_mode(mode)
@@ -274,10 +281,17 @@ class MHIIRClimateEntity(ClimateEntity, RestoreEntity):
         if preset_mode not in self._attr_preset_modes:
             raise HomeAssistantError(f"Unsupported preset mode: {preset_mode}")
 
-        if preset_mode != PRESET_NONE and self._attr_hvac_mode not in PRESET_HVAC_MODES:
+        if (
+            preset_mode not in (PRESET_NONE, PRESET_NIGHT_SETBACK)
+            and self._attr_hvac_mode not in PRESET_HVAC_MODES
+        ):
             raise HomeAssistantError(
                 f"Preset mode {preset_mode} is only available in cool, heat, or heat/cool"
             )
+
+        if preset_mode == PRESET_NIGHT_SETBACK:
+            self._attr_hvac_mode = HVACMode.HEAT
+            self._last_on_hvac_mode = HVACMode.HEAT
 
         self._set_preset_mode_without_ir(preset_mode)
         self.async_write_ha_state()
@@ -399,6 +413,9 @@ class MHIIRClimateEntity(ClimateEntity, RestoreEntity):
         self._reconcile_restored_swing_modes(horizontal_was_stored)
         if self._attr_hvac_mode not in PRESET_HVAC_MODES:
             self._set_preset_mode_without_ir(PRESET_NONE)
+        elif self._attr_preset_mode == PRESET_NIGHT_SETBACK:
+            self._attr_hvac_mode = HVACMode.HEAT
+            self._last_on_hvac_mode = HVACMode.HEAT
         elif self._attr_preset_mode == PRESET_BOOST:
             self._schedule_boost_preset_reset()
         self._ensure_fan_available_for_mode(self._attr_hvac_mode)

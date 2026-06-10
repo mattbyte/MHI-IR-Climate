@@ -22,6 +22,7 @@ This integration was built from decoded IR captures for:
 - Mitsubishi Heavy Industries DXK09ZSA-W with remote RLA502A720.
 - Mitsubishi Heavy Industries SRK35ZSA-W with remote RLA502A700L.
 - Tuya/Zosung-style Zigbee IR blasters exposed to Home Assistant as native infrared emitters.
+- Broadlink RM4 Mini IR blaster through the official Home Assistant Broadlink integration.
 
 ## 🚀 Installation With HACS
 
@@ -59,7 +60,7 @@ The device model shown in Home Assistant is fixed as **MHI ZSA Series (Avanti)**
 - Supports `off`, `cool`, `heat`, `dry`, `fan only`, and `heat/cool` HVAC modes.
 - Supports target temperatures from 18 C to 30 C in 1 C steps.
 - Supports fan speeds: `Auto`, `Very Low`, `Low`, `Medium`, and `High`.
-- Supports `Boost` and `Silent` climate presets in cool, heat, and heat/cool modes.
+- Supports `Boost`, `Silent`, and `Night Setback` climate presets. `Night Setback` switches the entity to heat mode before sending the IR command.
 - Clears `Boost` in Home Assistant state after 15 minutes without sending another IR command.
 - Supports vertical swing modes: `3D Auto`, `Stop`, `0 Deg`, `30 Deg`, `45 Deg`, `60 Deg`, `90 Deg`, and `Moving`.
 - Supports horizontal swing modes: `3D Auto`, `Stop`, `Hard Left`, `Left`, `Straight`, `Right`, `Hard Right`, `Wide`, `Narrow`, and `Moving`.
