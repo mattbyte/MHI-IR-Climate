@@ -1,7 +1,7 @@
 {
   "domain": "mhi_ir_climate",
   "name": "MHI IR Climate",
-  "version": "0.1.10",
+  "version": "0.1.11",
   "documentation": "https://github.com/mattbyte/MHI-IR-Climate",
   "issue_tracker": "https://github.com/mattbyte/MHI-IR-Climate/issues",
   "codeowners": ["@mattbyte"],

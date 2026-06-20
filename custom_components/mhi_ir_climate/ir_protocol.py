@@ -10,6 +10,12 @@ Mode = Literal["cool", "heat", "dry", "fan_only", "heat_cool"]
 
 DEFAULT_BASE_FRAME_HEX: Final = "52aec31ae5f609f807ff004db25aa5ff007f80"
 DEFAULT_CARRIER_FREQUENCY: Final = 38_000
+HEADER_MARK_US: Final = 3_200
+HEADER_SPACE_US: Final = 1_600
+BIT_MARK_US: Final = 400
+ZERO_SPACE_US: Final = 400
+ONE_SPACE_US: Final = 1_200
+TRAILER_MARK_US: Final = BIT_MARK_US
 
 TEMP_NIBBLE_START: Final = 64
 TEMP_COMP_START: Final = 56
@@ -342,12 +348,12 @@ def build_ac_frame_bytes(
 
 def frame_to_pulses_us(
     frame: bytes,
-    header_mark_us: int = 3176,
-    header_space_us: int = 1642,
-    bit_mark_us: int = 399,
-    zero_space_us: int = 399,
-    one_space_us: int = 1241,
-    trailer_mark_us: int = 344,
+    header_mark_us: int = HEADER_MARK_US,
+    header_space_us: int = HEADER_SPACE_US,
+    bit_mark_us: int = BIT_MARK_US,
+    zero_space_us: int = ZERO_SPACE_US,
+    one_space_us: int = ONE_SPACE_US,
+    trailer_mark_us: int = TRAILER_MARK_US,
 ) -> list[int]:
     """Convert a frame to alternating positive pulse/space durations."""
 
