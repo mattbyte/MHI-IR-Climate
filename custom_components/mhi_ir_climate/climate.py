@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+import logging
+from math import isfinite
 from typing import Any, cast
 
 from homeassistant.components import infrared
@@ -31,7 +34,7 @@ from homeassistant.core import HomeAssistant, State, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.event import async_call_later, async_track_state_change_event
-from homeassistant.helpers.restore_state import RestoreEntity
+from homeassistant.helpers.restore_state import ExtraStoredData, RestoreEntity
 
 from .const import (
     ATTR_INFRARED_EMITTER_ENTITY_ID,
@@ -80,6 +83,17 @@ PRESETS_WITHOUT_3D_AUTO = (PRESET_BOOST, PRESET_ECO)
 BOOST_PRESET_SECONDS = 15 * 60
 SWING_3D_AUTO = "3D Auto"
 SWING_STOP = "Stop"
+_LOGGER = logging.getLogger(__name__)
+
+
+@dataclass
+class MHIClimateExtraStoredData(ExtraStoredData):
+    """Climate settings saved independently of entity availability."""
+
+    settings: dict[str, Any]
+
+    def as_dict(self) -> dict[str, Any]:
+        return {"version": 1, **self.settings}
 
 
 async def async_setup_entry(
@@ -368,20 +382,54 @@ class MHIIRClimateEntity(ClimateEntity, RestoreEntity):
 
         await self.async_set_hvac_mode(self._last_on_hvac_mode)
 
+    @property
+    def extra_restore_state_data(self) -> MHIClimateExtraStoredData:
+        """Keep settings even when HA omits unavailable entity attributes."""
+
+        return MHIClimateExtraStoredData({
+            ATTR_HVAC_MODE: self._attr_hvac_mode,
+            ATTR_LAST_ON_HVAC_MODE: self._last_on_hvac_mode,
+            ATTR_TEMPERATURE: self._attr_target_temperature,
+            ATTR_FAN_MODE: self._attr_fan_mode,
+            ATTR_PRESET_MODE: self._attr_preset_mode,
+            ATTR_SWING_MODE: self._attr_swing_mode,
+            ATTR_SWING_HORIZONTAL_MODE: self._attr_swing_horizontal_mode,
+            ATTR_LAST_SWING_MODE: self._last_swing_mode,
+            ATTR_LAST_SWING_HORIZONTAL_MODE: self._last_swing_horizontal_mode,
+            ATTR_CURRENT_TEMPERATURE: self.current_temperature,
+            ATTR_CURRENT_HUMIDITY: self.current_humidity,
+        })
+
     async def async_turn_off(self) -> None:
         """Turn the AC off."""
 
         await self.async_set_hvac_mode(HVACMode.OFF)
 
     async def _async_restore_previous_state(self) -> None:
-        """Restore optimistic climate state from the recorder."""
+        """Restore settings from HA restore storage, with legacy fallback."""
 
         previous_state = await self.async_get_last_state()
-        if previous_state is None:
+        extra = await self.async_get_last_extra_data()
+        if previous_state is None and extra is None:
             return
 
+        attributes = _validated_restore_settings(
+            {**previous_state.attributes, ATTR_HVAC_MODE: previous_state.state}
+            if previous_state is not None else {}
+        )
+        if extra is not None:
+            stored = extra.as_dict()
+            if isinstance(stored, dict) and stored.get("version") == 1:
+                attributes.update(_validated_restore_settings(stored))
+        if ATTR_HVAC_MODE not in attributes or ATTR_TEMPERATURE not in attributes:
+            _LOGGER.warning(
+                "Incomplete saved climate settings for %s; unavailable values "
+                "will use defaults. Reselect the intended mode and temperature",
+                self._name,
+            )
+
         try:
-            previous_hvac_mode = HVACMode(previous_state.state)
+            previous_hvac_mode = HVACMode(attributes.get(ATTR_HVAC_MODE, HVACMode.OFF))
         except ValueError:
             previous_hvac_mode = HVACMode.OFF
 
@@ -390,43 +438,43 @@ class MHIIRClimateEntity(ClimateEntity, RestoreEntity):
             if previous_hvac_mode in ON_HVAC_MODES:
                 self._last_on_hvac_mode = previous_hvac_mode
 
-        if last_on_mode := previous_state.attributes.get(ATTR_LAST_ON_HVAC_MODE):
+        if last_on_mode := attributes.get(ATTR_LAST_ON_HVAC_MODE):
             try:
                 last_on_hvac_mode = HVACMode(last_on_mode)
             except ValueError:
-                last_on_hvac_mode = HVACMode.COOL
+                last_on_hvac_mode = self._last_on_hvac_mode
             if last_on_hvac_mode in ON_HVAC_MODES:
                 self._last_on_hvac_mode = last_on_hvac_mode
 
-        if (temperature := previous_state.attributes.get(ATTR_TEMPERATURE)) is not None:
+        if (temperature := attributes.get(ATTR_TEMPERATURE)) is not None:
             self._attr_target_temperature = _clamp_temperature(temperature)
 
-        if (fan_mode := previous_state.attributes.get(ATTR_FAN_MODE)) in FAN_MODES:
+        if (fan_mode := attributes.get(ATTR_FAN_MODE)) in FAN_MODES:
             self._attr_fan_mode = fan_mode
 
-        if (preset_mode := previous_state.attributes.get(ATTR_PRESET_MODE)) is not None:
+        if (preset_mode := attributes.get(ATTR_PRESET_MODE)) is not None:
             try:
                 self._attr_preset_mode = normalize_preset_mode(preset_mode)
             except ValueError:
                 pass
 
-        if (swing_mode := previous_state.attributes.get(ATTR_SWING_MODE)) in SWING_MODES:
+        if (swing_mode := attributes.get(ATTR_SWING_MODE)) in SWING_MODES:
             self._attr_swing_mode = swing_mode
             if swing_mode != SWING_3D_AUTO:
                 self._last_swing_mode = swing_mode
 
-        horizontal_restored = previous_state.attributes.get(ATTR_SWING_HORIZONTAL_MODE)
+        horizontal_restored = attributes.get(ATTR_SWING_HORIZONTAL_MODE)
         horizontal_was_stored = horizontal_restored is not None
         if horizontal_restored in SWING_HORIZONTAL_MODES:
             self._attr_swing_horizontal_mode = horizontal_restored
             if horizontal_restored != SWING_3D_AUTO:
                 self._last_swing_horizontal_mode = horizontal_restored
 
-        if last_swing_mode := previous_state.attributes.get(ATTR_LAST_SWING_MODE):
+        if last_swing_mode := attributes.get(ATTR_LAST_SWING_MODE):
             if last_swing_mode in SWING_MODES and last_swing_mode != SWING_3D_AUTO:
                 self._last_swing_mode = last_swing_mode
 
-        if last_swing_horizontal_mode := previous_state.attributes.get(
+        if last_swing_horizontal_mode := attributes.get(
             ATTR_LAST_SWING_HORIZONTAL_MODE
         ):
             if (
@@ -454,14 +502,14 @@ class MHIIRClimateEntity(ClimateEntity, RestoreEntity):
         self._ensure_swing_available_for_mode(self._attr_hvac_mode)
 
         if (
-            current_temperature := previous_state.attributes.get(
+            current_temperature := attributes.get(
                 ATTR_CURRENT_TEMPERATURE
             )
         ) is not None:
             self._attr_current_temperature = _maybe_float(current_temperature)
 
         if (
-            current_humidity := previous_state.attributes.get(ATTR_CURRENT_HUMIDITY)
+            current_humidity := attributes.get(ATTR_CURRENT_HUMIDITY)
         ) is not None:
             self._attr_current_humidity = _maybe_float(current_humidity)
 
@@ -704,6 +752,43 @@ class MHIIRClimateEntity(ClimateEntity, RestoreEntity):
         """Force-send the current IR state."""
 
         await self._async_send_current_state()
+
+
+def _validated_restore_settings(settings: dict[str, Any]) -> dict[str, Any]:
+    """Validate each field separately so partial snapshots remain usable."""
+
+    choices = {
+        ATTR_HVAC_MODE: SUPPORTED_HVAC_MODES,
+        ATTR_LAST_ON_HVAC_MODE: ON_HVAC_MODES,
+        ATTR_FAN_MODE: FAN_MODES,
+        ATTR_SWING_MODE: SWING_MODES,
+        ATTR_SWING_HORIZONTAL_MODE: SWING_HORIZONTAL_MODES,
+        ATTR_LAST_SWING_MODE: tuple(mode for mode in SWING_MODES if mode != SWING_3D_AUTO),
+        ATTR_LAST_SWING_HORIZONTAL_MODE: tuple(
+            mode for mode in SWING_HORIZONTAL_MODES if mode != SWING_3D_AUTO
+        ),
+    }
+    result = {
+        key: settings[key] for key, allowed in choices.items()
+        if isinstance(settings.get(key), str) and settings[key] in allowed
+    }
+    preset = settings.get(ATTR_PRESET_MODE)
+    if isinstance(preset, str):
+        try:
+            result[ATTR_PRESET_MODE] = normalize_preset_mode(preset)
+        except ValueError:
+            pass
+    for key in (ATTR_TEMPERATURE, ATTR_CURRENT_TEMPERATURE, ATTR_CURRENT_HUMIDITY):
+        value = settings.get(key)
+        if isinstance(value, bool):
+            continue
+        try:
+            number = float(value)
+        except (TypeError, ValueError, OverflowError):
+            continue
+        if isfinite(number):
+            result[key] = _clamp_temperature(number) if key == ATTR_TEMPERATURE else number
+    return result
 
 
 def _optional_entity_id(value: Any) -> str | None:

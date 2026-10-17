@@ -72,6 +72,10 @@ If a configured infrared emitter, temperature sensor, or humidity sensor is remo
 - Falls back to the last non-3D swing modes, or `Stop` when unknown, when `dry` or `fan only` mode is active because `3D Auto` is not available in those modes.
 - Restores the last HVAC mode, target temperature, fan mode, preset, and swing mode after Home Assistant restarts.
 
+Climate settings are saved separately from entity availability. If the infrared emitter is unavailable during a restart or integration reload, the climate entity stays unavailable but retains its remembered settings until the emitter returns. Restoration and emitter recovery do not automatically transmit IR.
+
+Existing saved states are supported on upgrade. Settings already lost by an older version cannot be reconstructed: reselect the intended mode and temperature once. Incomplete saved settings produce a warning in the Home Assistant log. Persistence uses Home Assistant's normal restore-storage lifecycle; abrupt power loss may still lose changes made since its last save.
+
 ## 🧰 Device Controls
 
 The integration also adds configuration entities on the device page:

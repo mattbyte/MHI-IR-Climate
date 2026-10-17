@@ -57,6 +57,9 @@ class RestoreEntity:
     async def async_get_last_state(self) -> object | None:
         return None
 
+    async def async_get_last_extra_data(self) -> object | None:
+        return None
+
 
 class HomeAssistantError(Exception):
     """Minimal Home Assistant service error."""
@@ -140,7 +143,11 @@ def _install_home_assistant_stubs() -> None:
         async_call_later=_async_call_later,
         async_track_state_change_event=lambda *_args, **_kwargs: _cancel_callback,
     )
-    _module("homeassistant.helpers.restore_state", RestoreEntity=RestoreEntity)
+    _module(
+        "homeassistant.helpers.restore_state",
+        RestoreEntity=RestoreEntity,
+        ExtraStoredData=object,
+    )
 
     infrared_protocols = _module("infrared_protocols", package=True)
     commands = _module("infrared_protocols.commands", Command=_Command)
