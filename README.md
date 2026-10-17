@@ -6,13 +6,13 @@
 
 MHI IR Climate is a Home Assistant custom integration for controlling Mitsubishi Heavy Industries ZSA-series air conditioners, commonly known as the Avanti series, through Home Assistant's native `infrared` platform.
 
-It creates a normal Home Assistant `climate` entity for an IR-only air conditioner and sends complete Mitsubishi Heavy Industries IR state frames through a selected infrared emitter. It is designed to work with native infrared emitters, including entities provided by [IR Wrapper for Zigbee IR Blasters](https://github.com/tomer2526/IR-Wrapper-for-Zigbee-IR-Bluster).
+It creates a normal Home Assistant `climate` entity for an IR-only air conditioner and sends complete Mitsubishi Heavy Industries IR state frames through a selected infrared emitter. It is designed to work with native infrared emitters, including Zigbee IR blasters exposed through Zigbee2MQTT's native infrared support.
 
 ## ✅ What You Need
 
 - Home Assistant 2026.4.0 or newer.
 - A native Home Assistant `infrared` emitter entity in the room with the air conditioner.
-- For Tuya/Zosung-style Zigbee IR blasters, install and configure [IR Wrapper for Zigbee IR Blasters](https://github.com/tomer2526/IR-Wrapper-for-Zigbee-IR-Bluster) first.
+- For supported Tuya/Zosung-style Zigbee IR blasters, use Zigbee2MQTT's native infrared support. This is the recommended method for exposing Zigbee IR blasters as native Home Assistant `infrared` emitter entities.
 - A supported Mitsubishi Heavy Industries ZSA/Avanti indoor unit or a compatible model using the same 19-byte command frame.
 
 ## 🧪 Tested Hardware
@@ -89,7 +89,7 @@ The integration also adds configuration entities on the device page:
 
 IR-controlled air conditioners usually expect every command to describe the whole desired state, not just the changed setting. When you change mode, temperature, fan, swing, preset, or a supported device setting, this integration builds a complete MHI frame and sends it as raw infrared timings through Home Assistant's `infrared.async_send_command` helper.
 
-For Zosung/Tuya Zigbee IR blasters, the companion Zigbee IR wrapper receives those raw timings and converts them into the `ir_code_to_send` payload required by Zigbee2MQTT or ZHA.
+For supported Zosung/Tuya Zigbee IR blasters, Zigbee2MQTT's native infrared support handles IR transport through the selected Home Assistant `infrared` emitter entity.
 
 ## ⚠️ Current Limitations
 
