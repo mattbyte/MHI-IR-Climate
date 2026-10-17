@@ -24,6 +24,13 @@ This integration was built from decoded IR captures for:
 - Tuya/Zosung-style Zigbee IR blasters exposed to Home Assistant as native infrared emitters.
 - Broadlink RM4 Mini IR blaster through the official Home Assistant Broadlink integration.
 
+Community reports in [issue #3](https://github.com/mattbyte/MHI-IR-Climate/issues/3) also confirm:
+
+- Broadlink RM4 Pro through the official Home Assistant Broadlink integration, used with an SRK35ZSA-W and RLA502A700L remote, including clean-cycle turn-off.
+- An Australian Bronte 7.1 kW unit with the RLA502A700L remote and an RM4 Pro, using the unchanged default base frame. Cooling, vertical and horizontal louvre control, and clean-cycle turn-off from cooling were confirmed. The exact indoor-unit model remains unconfirmed; the reporter identified the SRK71ZRA-W / DXK24ZRA-W model range.
+
+These reports cover the functions listed above. A shared remote model is a useful compatibility clue, but does not establish support for every unit or feature.
+
 ## 🚀 Installation With HACS
 
 1. In Home Assistant, open **HACS**.
@@ -85,6 +92,10 @@ The integration also adds configuration entities on the device page:
 - **Auto clean** switch, including clean-cycle turn-off commands for cool, dry, and heat/cool modes.
 - **Force send IR command** button for resending the current Home Assistant state when the physical unit and Home Assistant are out of sync.
 
+Installation position defaults to **Centre**, the unit's factory default, and restores the last selection made in Home Assistant. The displayed value is assumed: the integration cannot read the unit's stored position or detect changes made with the physical remote. Like the factory remote, it sends a position-setting command only when you explicitly change the selection while the unit is off. Ordinary commands using the default base frame leave the stored position unchanged.
+
+Selecting the already-displayed position sends no command, and **Force send IR command** does not resend the installation position. If the physical remote has changed it, select a different position and then the desired position while the unit is off to synchronize it.
+
 ## 📡 How It Works
 
 IR-controlled air conditioners usually expect every command to describe the whole desired state, not just the changed setting. When you change mode, temperature, fan, swing, preset, or a supported device setting, this integration builds a complete MHI frame and sends it as raw infrared timings through Home Assistant's `infrared.async_send_command` helper.
@@ -99,3 +110,5 @@ For supported Zosung/Tuya Zigbee IR blasters, Zigbee2MQTT's native infrared supp
 ## 🛠️ Development Notes
 
 The protocol builder in `custom_components/mhi_ir_climate/ir_protocol.py` is based on decoded IR captures and the original working pyscript encoder. It keeps the MHI frame manipulation local to this integration and leaves IR transport and Zigbee payload encoding to Home Assistant's native infrared emitter layer.
+
+Installation position uses mask `0x60` in byte 17. The default base frame contains `0x60`, meaning **leave the stored position unchanged**, rather than an unconfigured or fourth position. Explicit position commands encode `Left = 0x00`, `Right = 0x20`, or `Centre = 0x40`. Normal commands preserve these bits from the configured base frame; changing them in a custom base frame changes that behavior.
